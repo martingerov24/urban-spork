@@ -19,6 +19,41 @@ void SmallDataTransfer(std::string * msg)
 {
 
 }
+std::vector<uint8_t> readingFiles(char* fileName, int height, int width)
+{
+	FILE* rdFile = fopen(fileName, "rb+");
+	std::vector<uint8_t> data;
+	if (rdFile == 0) {
+		printf("no file found!");
+		return data;
+	}
+	int size = height * width;
+	data.resize(size);
+	fread(reinterpret_cast<char*>(&data[0]), 2, size, rdFile);
+	fclose(rdFile);
+	return data;
+}
+
+std::vector<uint8_t> load(const std::string& filename, int& width, int& height, int& channels)
+{
+	unsigned char* img = stbi_load(filename.c_str(), &width, &height, &channels, 1);
+	//stbir_resize_uint8(img, width, height, 0, img, width, height, 0, 1);
+	if (img == NULL) { throw "the file was not found"; }
+	std::vector<uint8_t> image(width * height * channels);
+	memcpy(&image[0], img, image.size());
+	if (image.empty()) { throw "vector is null"; }
+	stbi_image_free(img);
+	return image;
+}
+
+void sendImage(const std::string& imageName)
+{
+	int width, height, channels;
+	std::vector<uint8_t> image = load(imageName, width, height, channels);
+	zmq::message_t request(image.size());
+	memcpy(request.data(), (image.data()), (image.size()));
+	socket.send(request);
+}
 void LargeDataTransferInBytes(std::string* file)
 {
 	FILE* rdfile = fopen(file->c_str(), "r+");
