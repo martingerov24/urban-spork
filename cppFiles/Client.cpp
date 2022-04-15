@@ -1,11 +1,26 @@
 #include "Client.h"
 #include <sys/stat.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "third_party/stbi_load.h"
 
 long GetFileSize(std::string * filename)
 {
 	struct stat stat_buf;
 	int rc = stat(filename->c_str(), &stat_buf);
 	return rc == 0 ? stat_buf.st_size : -1;
+}
+
+void LargeDataTransferInBytes(std::string* file)
+{
+	FILE* rdfile = fopen(file->c_str(), "r+");
+	std::vector<char> data;
+	if (rdfile == 0) { throw "no file found!"; }
+	long size = GetFileSize(file);
+	if (size == -1) { throw "file size is zero!"; }
+	data.resize(size);
+	fread(reinterpret_cast<char*>(&data[0]), 1, size, rdfile);
+	fclose(rdfile);
+	return;
 }
 
 void Client::Stop()
@@ -19,6 +34,7 @@ void SmallDataTransfer(std::string * msg)
 {
 
 }
+
 std::vector<uint8_t> readingFiles(char* fileName, int height, int width)
 {
 	FILE* rdFile = fopen(fileName, "rb+");
@@ -46,7 +62,7 @@ std::vector<uint8_t> load(const std::string& filename, int& width, int& height, 
 	return image;
 }
 
-void sendImage(const std::string& imageName)
+void Client::sendImage(const std::string& imageName)
 {
 	int width, height, channels;
 	std::vector<uint8_t> image = load(imageName, width, height, channels);
@@ -54,19 +70,36 @@ void sendImage(const std::string& imageName)
 	memcpy(request.data(), (image.data()), (image.size()));
 	socket.send(request);
 }
-void LargeDataTransferInBytes(std::string* file)
+void Client::work(const ClientMsg msg, const std::string &message = "")
 {
-	FILE* rdfile = fopen(file->c_str(), "r+");
-	std::vector<char> data;
-	if (rdfile == 0) { throw "no file found!"; }
-	long size = GetFileSize(file);
-	if (size == -1) {throw "file size is zero!"; }
-	data.resize(size);
-	fread(reinterpret_cast<char*>(&data[0]), 1, size, rdfile);
-	fclose(rdfile);
-	return;
+	if (m_message == ClientMsg::Stop) {
+		Stop();
+	}
+	else if (m_message == ClientMsg::Send) {
+		Send(message);
+	}
+	else if (m_message == ClientMsg::Continue) {
+		this->work(msg);
+	}
 }
-void Client::Send(std::string * msg)
+void Client::setClientStatus(const ClientMsg msg,const SendOptions sendOpt)
+{
+	this->m_message = msg;
+	this->sendOpt = sendOpt;
+}
+void Client::setClientStatus(const ClientMsg msg = ClientMsg::Continue)
+{
+	this->m_message = msg;
+}
+void Client::setClientStatus(const ClientMsg msg = ClientMsg::Continue, const SendOptions sendOpt = SendOptions::SmallData, const std::string & message = "")
+{
+	this->m_message = msg;
+}
+void Client::connect(const std::string& port)
+{
+	socket.connect(port);
+};
+void Client::Send(const std::string& msg)
 {
 	if (Client::sendOpt == SendOptions::SmallData)
 	{
