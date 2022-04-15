@@ -1,6 +1,7 @@
 #pragma once
 #define THREADS_PER_BLOCK 1024
 #define getGlobalID(X) (blockIdx.x * blockDim.x + threadIdx.x)
+
 #include "cuda_runtime.h"
 #include "cuda/std/cmath"
 #include "device_launch_parameters.h"
