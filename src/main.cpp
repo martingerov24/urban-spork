@@ -15,11 +15,115 @@
 #include "Mesh.h"
 
 #include "cl_rl/Client.h"
-#include "cl_rl/Render.h"
 
 #define TEST_DISTRIBUTE 0
 
 /// Camera description, can be pointed at point, used to generate screen rays
+struct Camera {
+	const vec3 worldUp = { 0, 1, 0 };
+	float aspect;
+	vec3 origin;
+	vec3 llc;
+	vec3 left;
+	vec3 up;
+
+	void lookAt(float verticalFov, const vec3& lookFrom, const vec3& lookAt) {
+		origin = lookFrom;
+		const float theta = degToRad(verticalFov);
+		float half_height = tan(theta / 2);
+		const float half_width = aspect * half_height;
+
+		const vec3 w = (origin - lookAt).normalized();
+		const vec3 u = cross(worldUp, w).normalized();
+		const vec3 v = cross(w, u);
+		llc = origin - half_width * u - half_height * v - w;
+		left = 2 * half_width * u;
+		up = 2 * half_height * v;
+	}
+
+	Ray getRay(float u, float v) const {
+		return Ray(origin, (llc + u * left + v * up - origin).normalized());
+	}
+};
+
+vec3 raytrace(const Ray& r, Instancer& prims, int depth = 0) {
+	Intersection data;
+	if (prims.intersect(r, 0.001f, FLT_MAX, data)) {
+		Ray scatter;
+		Color attenuation;
+		if (depth < MAX_RAY_DEPTH && data.material->shade(r, data, attenuation, scatter)) {
+			const Color incoming = raytrace(scatter, prims, depth + 1);
+			return attenuation * incoming;
+		}
+		else {
+			return Color(0.f);
+		}
+	}
+	const vec3 dir = r.dir;
+	const float f = 0.5f * (dir.y + 1.f);
+	return (1.f - f) * vec3(1.f) + f * vec3(0.5f, 0.7f, 1.f);
+}
+
+/// The whole scene description
+struct Scene : Task {
+	Scene() = default;
+	Scene(const Scene&) = delete;
+	Scene& operator=(const Scene&) = delete;
+
+	int width = 640;
+	int height = 480;
+	int samplesPerPixel = 2;
+	std::string name;
+	std::atomic<int> renderedPixels;
+	Instancer primitives;
+	Camera camera;
+	ImageData image;
+
+	void onBeforeRender() {
+		primitives.onBeforeRender();
+	}
+
+	void initImage(int w, int h, int spp) {
+		image.init(w, h);
+		width = w;
+		height = h;
+		samplesPerPixel = spp;
+		camera.aspect = float(width) / height;
+	}
+
+	void addPrimitive(PrimPtr primitive) {
+		primitives.addInstance(std::move(primitive));
+	}
+
+	void render(ThreadManager& tm) {
+		runOn(tm);
+	}
+
+	void run(int threadIndex, int threadCount) override {
+		const int total = width * height;
+		const int incrementPrint = total / 100;
+		for (int idx = threadIndex; idx < total; idx += threadCount) {
+			const int r = idx / width;
+			const int c = idx % width;
+
+			Color avg(0);
+			for (int s = 0; s < samplesPerPixel; s++) {
+				const float u = float(c + randFloat()) / float(width);
+				const float v = float(r + randFloat()) / float(height);
+				const Ray& ray = camera.getRay(u, v);
+				const vec3 sample = raytrace(ray, primitives);
+				avg += sample;
+			}
+
+			avg /= samplesPerPixel;
+			image(c, height - r - 1) = Color(sqrtf(avg.x), sqrtf(avg.y), sqrtf(avg.z));
+			const int completed = renderedPixels.fetch_add(1, std::memory_order_relaxed);
+			if (completed % incrementPrint == 0) {
+				printf("\r%d%% ", int(float(completed) / float(total) * 100));
+			}
+		}
+	}
+};
 
 void sceneExample(Scene &scene) {
 	scene.name = "example";
@@ -106,7 +210,7 @@ void clien()
 {
 	Client c;
 	c.connect("tcp://localhost:5555");
-	c.work();
+	c.work(ClientMsg::Continue, "");
 }
 
 void ren()
