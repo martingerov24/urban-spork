@@ -4,64 +4,83 @@
 #include <conio.h>
 
 #include "../../cppzmq/zmq.hpp"
-
-enum class ClientMsg : uint32_t
-{
-	Send = 0,
-	Stop = 1,
-	Continue = 2,
-	Deactivate = 4
-};
-enum class SendOptions : uint32_t
-{
-	SmallData = 0,
-<<<<<<< HEAD
-	FileInBytes = 1,
-	LargeObj = 2
-=======
-	File = 1
->>>>>>> d01b0b5ea4863ae389b755c38cbe808b8c56ad45
-};
+#include "../dep/dependencies.h"
+//question -> am i able to make a vector of functions and insted of switch cases from the enum
+//just [] to the functions(if it makes sense)
 
 class Client
 {
-	void Stop();
 	void Ask();
-	void Send(std::string* message);
+	Result Stop();
+	Result Send(const std::string& message);
 	Client(Client& other) = delete;
 	Client(Client&& other) = delete;
 	Client operator=(Client& other) = delete;
 	Client& operator=(Client&& other) = delete;
-	//connect to a local host
+	bool SplitPackage(const std::vector<uint8_t>& package);
+	bool LargeDataTransferInBytes(const std::string& file);
+	//Send
+	bool sendImage(const std::string& imageName);
+	bool readingP1Send(const std::string& fileName, int height, int width);
+	bool loadAndSend(const std::string& filename, int& width, int& height, int& channels);
 public:
 	Client() = default;
-	void connect(const std::string& port)
+	void connect(const std::string& port);
+	Result Client::setClientStatusAndSend(const ClientMsg msg, const SendOptions sendOpt, const std::string& message);
+	~Client();
+private:
+	ClientMsg m_message = ClientMsg::None;
+	SendOptions sendOpt = SendOptions::SmallData;
+	zmq::context_t context{ 1 };
+	zmq::socket_t socket{ context, zmq::socket_type::req };
+	zmq::message_t message;
+};
+
+class Render
+{
+public:
+	Render() = default;
+	Render(Render& other) = delete;
+	Render(Render&& other) noexcept
 	{
-		socket.connect(port);
-	};
-	void work(std::string* message = nullptr)
+		std::swap(*this, other);
+	}
+	Render operator=(Render& other) = delete;
+	Render& operator=(Render&& other) noexcept
 	{
-		if (m_message == ClientMsg::Continue){
-			this->work();
+		if (this != &other)
+		{
+			std::swap(*this, other);
 		}
-		else if (m_message == ClientMsg::Stop){
-			Stop();
-		}
-		else if (m_message == ClientMsg::Send){
-			Send(message);
+		return *this;
+	}
+	void bind(const std::string&& port)
+	{
+		socket.bind(port);
+	}
+	void testFuncRecvJob()
+	{
+		const std::string data{ "World" };
+
+		for (int i = 0; i < 10; i++)
+		{
+			zmq::message_t request;
+
+			// receive a request from client
+			socket.recv(request, zmq::recv_flags::none);
+			//std::cout << "Received " << request.to_string() << std::endl;
+
+			// simulate work
+			std::this_thread::sleep_for(std::chrono::seconds(1));
+
+			// send the reply to the client
+			socket.send(zmq::buffer(data), zmq::send_flags::none);
 		}
 	}
-	void setClientStatus(ClientMsg msg = ClientMsg::Continue 
-		, SendOptions sendOpt = SendOptions::SmallData)
-	{
-		this->m_message = msg;
-	}
-	~Client()
+	~Render()
 	{
 	}
 private:
-	ClientMsg m_message = ClientMsg::Continue;
-	SendOptions sendOpt;
 	zmq::context_t context{ 1 };
-	zmq::socket_t socket{ context, zmq::socket_type::req };
+	zmq::socket_t  socket{ context, zmq::socket_type::rep };
 };

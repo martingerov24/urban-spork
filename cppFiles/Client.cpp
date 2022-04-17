@@ -1,41 +1,75 @@
 #include "Client.h"
 #include <sys/stat.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "third_party/stbi_load.h"
 
-long GetFileSize(std::string * filename)
+long GetFileSize(const char * filename)
 {
 	struct stat stat_buf;
-	int rc = stat(filename->c_str(), &stat_buf);
+	int rc = stat(filename, &stat_buf);
 	return rc == 0 ? stat_buf.st_size : -1;
 }
 
-void Client::Stop()
+bool Client::SplitPackage(const std::vector<uint8_t>& package)
 {
+	//TODO: and a package special number
+	int sizeOfBlock = (package.size() + PackageSize - 1) / PackageSize;
+	zmq::message_t msg(PackageSize);
+	int blockRecursiveSending = 3;
+	for (int i = 0; i < sizeOfBlock; i++)
+	{
+		memcpy(&msg, package.data() + i * PackageSize, PackageSize);
+		zmq::send_result_t sended = socket.send(msg, zmq::send_flags::none);
+		if (!sended.has_value() && blockRecursiveSending >= 0)
+		{//find better way
+			i--;
+			blockRecursiveSending--;
+		}
+	}
+	return blockRecursiveSending >= 1 ? true : false;
+}
+
+bool Client::LargeDataTransferInBytes(const std::string& file) //TODO: def thy this
+{	//it cannot be nullptr, but lets see if it will crash
+	FILE* rdfile = fopen(file.c_str(), "r+");
+	std::vector<uint8_t> data;
+
+	if (rdfile == 0) { throw "no file found!"; }
+	long size = GetFileSize(file.c_str());
+	if (size == -1) { throw "file size is zero!"; }
+
+	data.resize(size);
+	fread(reinterpret_cast<char*>(&data[0]), 1, size, rdfile);
+	fclose(rdfile);
+	return SplitPackage(data);
+}
+
+Result Client::Stop()
+{
+	return Result::Succeeded; // for now
 }
 
 void Client::Ask()
 {
 }
-void SmallDataTransfer(std::string * msg)
-{
 
-}
-<<<<<<< HEAD
-std::vector<uint8_t> readingFiles(char* fileName, int height, int width)
-{
-	FILE* rdFile = fopen(fileName, "rb+");
+bool Client::readingP1Send(const std::string &fileName, int height, int width) 
+{	//TODO: filename have to contain the heihgt and width
+	FILE* rdFile = fopen(fileName.c_str(), "rb+");
 	std::vector<uint8_t> data;
 	if (rdFile == 0) {
 		printf("no file found!");
-		return data;
+		return false;
 	}
 	int size = height * width;
 	data.resize(size);
 	fread(reinterpret_cast<char*>(&data[0]), 2, size, rdFile);
 	fclose(rdFile);
-	return data;
+	
+	return SplitPackage(data);
 }
 
-std::vector<uint8_t> load(const std::string& filename, int& width, int& height, int& channels)
+bool Client::loadAndSend(const std::string& filename, int& width, int& height, int& channels)
 {
 	unsigned char* img = stbi_load(filename.c_str(), &width, &height, &channels, 1);
 	//stbir_resize_uint8(img, width, height, 0, img, width, height, 0, 1);
@@ -44,41 +78,60 @@ std::vector<uint8_t> load(const std::string& filename, int& width, int& height, 
 	memcpy(&image[0], img, image.size());
 	if (image.empty()) { throw "vector is null"; }
 	stbi_image_free(img);
-	return image;
+	return SplitPackage(image);
+}
+bool Client::sendImage(const std::string& imageName)
+{
+	bool result;
+	int width, height, channels;
+	if (Client::sendOpt == SendOptions::ImageP1)
+	{
+		//return readingP1Send(imageName);
+	}
+	return loadAndSend(imageName, width, height, channels);
 }
 
-void sendImage(const std::string& imageName)
+Result Client::Send(const std::string& msg)
 {
-	int width, height, channels;
-	std::vector<uint8_t> image = load(imageName, width, height, channels);
-	zmq::message_t request(image.size());
-	memcpy(request.data(), (image.data()), (image.size()));
-	socket.send(request);
-}
-=======
->>>>>>> d01b0b5ea4863ae389b755c38cbe808b8c56ad45
-void LargeDataTransferInBytes(std::string* file)
-{
-	FILE* rdfile = fopen(file->c_str(), "r+");
-	std::vector<char> data;
-	if (rdfile == 0) { throw "no file found!"; }
-	long size = GetFileSize(file);
-	if (size == -1) {throw "file size is zero!"; }
-	data.resize(size);
-	fread(reinterpret_cast<char*>(&data[0]), 1, size, rdfile);
-	fclose(rdfile);
-	return;
-}
-void Client::Send(std::string * msg)
-{
+	bool result = false;
 	if (Client::sendOpt == SendOptions::SmallData)
 	{
-
+		socket.send(zmq::buffer(msg), zmq::send_flags::none);
 	}
-	else if(Client::sendOpt == SendOptions::SmallData)
+	else if (Client::sendOpt == SendOptions::FileInBytes)
 	{
-
+		result = LargeDataTransferInBytes(msg);
 	}
-	Client::m_message = ClientMsg::Continue;
+	else // else is the image
+	{
+		result = sendImage(msg); // msg is the file name
+	}
+	Client::m_message = ClientMsg::None;
+	return result == true ? Result::Succeeded : Result::FailedToSend;
 }
 
+
+Result Client::setClientStatusAndSend(const ClientMsg msg = ClientMsg::None, const SendOptions sendOpt = SendOptions::SmallData, const std::string & message = "")
+{
+	Result temp;
+	this->sendOpt = sendOpt;
+	if (msg == ClientMsg::Send)
+	{
+		temp = Send(message);
+	}
+	else if (msg == ClientMsg::Stop)
+	{
+		
+	}
+}
+void Client::connect(const std::string& port)
+{
+	socket.connect(port);
+};
+
+Client::~Client()
+{
+	message.empty();
+	socket.close();
+	context.close();
+}
