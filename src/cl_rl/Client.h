@@ -15,8 +15,12 @@ enum class ClientMsg : uint32_t
 enum class SendOptions : uint32_t
 {
 	SmallData = 0,
+<<<<<<< HEAD
 	FileInBytes = 1,
 	LargeObj = 2
+=======
+	File = 1
+>>>>>>> d01b0b5ea4863ae389b755c38cbe808b8c56ad45
 };
 
 class Client

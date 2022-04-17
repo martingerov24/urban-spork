@@ -19,6 +19,7 @@ void SmallDataTransfer(std::string * msg)
 {
 
 }
+<<<<<<< HEAD
 std::vector<uint8_t> readingFiles(char* fileName, int height, int width)
 {
 	FILE* rdFile = fopen(fileName, "rb+");
@@ -54,6 +55,8 @@ void sendImage(const std::string& imageName)
 	memcpy(request.data(), (image.data()), (image.size()));
 	socket.send(request);
 }
+=======
+>>>>>>> d01b0b5ea4863ae389b755c38cbe808b8c56ad45
 void LargeDataTransferInBytes(std::string* file)
 {
 	FILE* rdfile = fopen(file->c_str(), "r+");
