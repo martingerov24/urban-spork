@@ -14,7 +14,6 @@
 #include "Image.hpp"
 #include "Mesh.h"
 
-#include <synchapi.h> // this is for windows
 #include "cl_rl/Client.h"
 
 #define TEST_DISTRIBUTE 1
@@ -211,31 +210,32 @@ void sceneHeavyMesh(Scene &scene) {
 void ren()
 {
 	Render r;
-	r.bind("tcp://*:5555");
+	r.bind("tcp://0.0.0.0:5555");
 	r.testFuncRecvJob();
 }
-
+//this is working
 void connect()
 {
-	zmq::context_t context{ 1 };
-	zmq::socket_t socket{ context, zmq::socket_type::rep };
-	socket.bind("tcp://0.0.0.0:5555");
-	while (true)
-	{
-		zmq::message_t request;
+	ren();
+	//zmq::context_t context{ 1 };
+	//zmq::socket_t socket{ context, zmq::socket_type::rep };
+	//socket.bind("tcp://0.0.0.0:5555");
+	//while (true)
+	//{
+	//	zmq::message_t request;
 
-		//  Wait for next request from client
-		socket.recv(&request);
-		std::cout << request << std::endl;
+	//	//  Wait for next request from client
+	//	socket.recv(&request);
+	//	std::cout << request << std::endl;
 
-		//  Do some 'work'
-		Sleep(1);
+	//	//  Do some 'work'
+	//	Sleep(1);
 
-		//  Send reply back to client
-		zmq::message_t reply(5);
-		memcpy((void*)reply.data(), "World", 5);
-		socket.send(reply);
-	}
+	//	//  Send reply back to client
+	//	zmq::message_t reply(5);
+	//	memcpy((void*)reply.data(), "World", 5);
+	//	socket.send(reply);
+	//}
 }
 
 #endif // TEST 
