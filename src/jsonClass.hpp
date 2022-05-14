@@ -9,26 +9,26 @@ struct JsonFile
 	// in reserve i have added 5 jsons
 	JsonFile()
 	{
-		//premadeJsons.resize((int)JsonSend::Count);
+		premadeJsons.resize((int)JsonSend::Count);
 	};
 	void jsonRecieve(std::string& json)
 	{
-		premadeJsons.emplace_back(json.c_str());
+		premadeJsons[count] = nlohmann::json::parse(json.c_str());
 		std::cout << premadeJsons[count].dump().c_str() << "\n";
 		count++;
 	}
 	void initImageData(ImageData & imageData)
 	{
-		nlohmann::json tmp = premadeJsons[0];
+		nlohmann::json tmp = premadeJsons[static_cast<int>(JsonSend::InitImage)];
 		int w = tmp["width"].get<int>();
 		imageData.init(tmp["width"], tmp["height"]);
 	}
 	void initCameraLookAt(Camera & camera)
 	{
 		nlohmann::json tmp = premadeJsons[static_cast<int>(JsonSend::CameraLookAt)];
-		camera.lookAt(tmp["verticalFov"]
-			, static_cast<vec3>(tmp["lookFrom"])
-			, static_cast<vec3>(tmp["lookAt"]));
+		vec3 lookFrom(tmp["lookFromX"], tmp["lookFromY"], tmp["lookFromZ"]);
+		vec3 lookAt(tmp["lookAtX"], tmp["lookAtY"], tmp["lookAtZ"]);
+		camera.lookAt(tmp["verticalFov"], lookFrom, lookAt);
 	}
 	~JsonFile() = default;
 private:
