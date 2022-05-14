@@ -21,6 +21,9 @@ set(HEADERS
 	src/third_party/stbi_load.h
 	src/third_party/stb_image_write.h
 	src/third_party/tiny_obj_loader.h
+	src/third_party/jsoncpp.hpp
+	src/jsonClass.hpp
+	src/camera.hpp
 
 	libzmq/include/zmq.h
 	libzmq/include/zmq_utils.h
@@ -39,6 +42,7 @@ set(HOST_SOURCES
 	cppFiles/Material.cpp
 	cppFiles/Primitive.cpp
 	cppFiles/Accelerators.cpp
+
 )
 
 set(DEVICE_SOURCES

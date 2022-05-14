@@ -42,7 +42,13 @@ struct ImageData {
 		height = h;
 		pixels.resize(width * height);
 	}
-
+	void init(ImageData &data)
+	{
+		width = data.width;
+		height = data.height;
+		pixels.resize(width * height);
+	}
+	ImageData(ImageData&& data) = delete;
 	ImageData(int width, int height) {
 		init(width, height);
 	}

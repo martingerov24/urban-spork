@@ -22,3 +22,10 @@ enum class Result : uint8_t
 	FailedToSend = 0, 
 	Succeeded = 1,
 };
+
+enum class JsonSend : uint8_t
+{
+	InitImage = 0,
+	CameraLookAt = 1,
+	Count = 2
+};

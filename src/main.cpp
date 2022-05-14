@@ -16,35 +16,9 @@
 
 #include "cl_rl/Client.h"
 
-#define TEST_DISTRIBUTE 1
+#define TEST_DISTRIBUTE 0
 
 /// Camera description, can be pointed at point, used to generate screen rays
-struct Camera {
-	const vec3 worldUp = { 0, 1, 0 };
-	float aspect;
-	vec3 origin;
-	vec3 llc;
-	vec3 left;
-	vec3 up;
-
-	void lookAt(float verticalFov, const vec3& lookFrom, const vec3& lookAt) {
-		origin = lookFrom;
-		const float theta = degToRad(verticalFov);
-		float half_height = tan(theta / 2);
-		const float half_width = aspect * half_height;
-
-		const vec3 w = (origin - lookAt).normalized();
-		const vec3 u = cross(worldUp, w).normalized();
-		const vec3 v = cross(w, u);
-		llc = origin - half_width * u - half_height * v - w;
-		left = 2 * half_width * u;
-		up = 2 * half_height * v;
-	}
-
-	Ray getRay(float u, float v) const {
-		return Ray(origin, (llc + u * left + v * up - origin).normalized());
-	}
-};
 
 vec3 raytrace(const Ray& r, Instancer& prims, int depth = 0) {
 	Intersection data;
@@ -81,6 +55,10 @@ struct Scene : Task {
 
 	void onBeforeRender() {
 		primitives.onBeforeRender();
+	}
+	void initImage(ImageData& image)
+	{
+		image.init(image);
 	}
 
 	void initImage(int w, int h, int spp) {
@@ -207,35 +185,14 @@ void sceneHeavyMesh(Scene &scene) {
 }
 #ifdef TEST_DISTRIBUTE
 
-void ren()
+void setup(Render& r, Scene &scene)
 {
-	Render r;
+	std::vector<std::string> temp;
 	r.bind("tcp://0.0.0.0:5555");
-	r.testFuncRecvJob();
-}
-//this is working
-void connect()
-{
-	ren();
-	//zmq::context_t context{ 1 };
-	//zmq::socket_t socket{ context, zmq::socket_type::rep };
-	//socket.bind("tcp://0.0.0.0:5555");
-	//while (true)
-	//{
-	//	zmq::message_t request;
-
-	//	//  Wait for next request from client
-	//	socket.recv(&request);
-	//	std::cout << request << std::endl;
-
-	//	//  Do some 'work'
-	//	Sleep(1);
-
-	//	//  Send reply back to client
-	//	zmq::message_t reply(5);
-	//	memcpy((void*)reply.data(), "World", 5);
-	//	socket.send(reply);
-	//}
+	r.testFuncRecvJob(temp);
+	r.ConvertStringtoJson(temp);
+	r.Init(scene.image);
+	r.Init(scene.camera);
 }
 
 #endif // TEST 
@@ -249,7 +206,10 @@ int main(int argc, char *argv[]) {
 		sceneManyHeavyMeshes
 	};
 #ifdef TEST_DISTRIBUTE 
-	connect();
+	Scene scene;
+	Render r; 
+	ImageData data;
+	setup(r, scene);
 #else
 #endif
 	puts("> There are 4 scenes (0,1,2,3) to render");
